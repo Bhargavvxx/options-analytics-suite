@@ -1,0 +1,58 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+*.egg
+
+# Virtual environments
+venv/
+env/
+.venv/
+.env/
+
+# IDE / Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Streamlit
+.streamlit/secrets.toml
+
+# Jupyter Notebook
+.ipynb_checkpoints/
+
+# TensorFlow / Keras
+*.h5
+*.keras
+*.pb
+saved_model/
+
+# Model artifacts
+models/*.pkl
+models/*.joblib
+models/*.h5
+
+# Logs
+*.log
+
+# Environment variables
+.env
+.env.local
+
+# pytest
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.xml
