@@ -33,7 +33,7 @@ def render(p: SidebarParams) -> None:
         if st.button("Run Backtest"):
             provider = get_default_provider()
             try:
-                prices, _ = provider.fetch_history(p.ticker, period=p.history_period)
+                prices, _ = provider.get_stock_data(p.ticker, period=p.history_period)
             except Exception as e:
                 st.error(f"Data fetch failed: {e}")
                 return
@@ -43,7 +43,9 @@ def render(p: SidebarParams) -> None:
                 return
 
             # Compute IV proxy & HV and add to frame
-            hv = historical_volatility(prices["Close"], window=20)
+            import numpy as np
+            log_returns = np.log(prices["Close"] / prices["Close"].shift(1))
+            hv = historical_volatility(log_returns, window=20)
             prices["HV"] = hv
             prices["IV"] = p.volatility  # placeholder — real IV requires chain data
 

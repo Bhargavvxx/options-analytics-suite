@@ -199,7 +199,9 @@ def _compute_diagnostics(surface: IVSurface, S: float) -> Dict[str, float]:
     ivs = np.array([p.iv for p in valid])
     moneyness = np.array([p.moneyness for p in valid])
 
-    diags["atm_iv"] = float(np.mean([p.iv for p in valid if 0.95 <= p.moneyness <= 1.05]))  # type: ignore
+    atm_ivs = [p.iv for p in valid if 0.95 <= p.moneyness <= 1.05]
+    if atm_ivs:
+        diags["atm_iv"] = float(np.mean(atm_ivs))
     diags["avg_iv"] = float(np.mean(ivs))
 
     # Skew = Δ(IV) per Δ(moneyness) — simple linear regression

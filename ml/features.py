@@ -120,9 +120,7 @@ def build_feature_matrix(
 
     # -- Target: forward 20-day realised vol --
     if target:
-        fwd = log_ret.shift(-20).rolling(20).std() * np.sqrt(ann_factor)
-        # shift(-20) looks forward, rolling(20) needs 20 more → we need the
-        # forward window.  Simpler: use a forward-looking rolling.
+        # Forward-looking rolling vol: reverse, compute rolling std, reverse back
         fwd_ret = log_ret.iloc[::-1].rolling(20).std().iloc[::-1] * np.sqrt(ann_factor)
         df[TARGET_COL] = fwd_ret.shift(-1)  # 1-day-ahead avoids look-ahead
 

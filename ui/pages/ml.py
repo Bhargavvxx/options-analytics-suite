@@ -30,7 +30,7 @@ def render(p: SidebarParams) -> None:
     if st.button("Train & Evaluate"):
         provider = get_default_provider()
         try:
-            prices, _ = provider.fetch_history(p.ticker, period=p.history_period)
+            prices, _ = provider.get_stock_data(p.ticker, period=p.history_period)
         except Exception as e:
             st.error(f"Data fetch failed: {e}")
             return
@@ -85,7 +85,7 @@ def render(p: SidebarParams) -> None:
     if "trained_model" in st.session_state:
         provider = get_default_provider()
         try:
-            prices, _ = provider.fetch_history(p.ticker, period="6mo")
+            prices, _ = provider.get_stock_data(p.ticker, period="6mo")
             preds = predict(st.session_state["trained_model"], prices, latest_only=True)
             if len(preds) > 0:
                 st.metric("Predicted Forward 20d Vol", f"{preds.iloc[-1]:.1%}")

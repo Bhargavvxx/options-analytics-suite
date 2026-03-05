@@ -64,8 +64,10 @@ def compute_metrics(
     excess = ret - daily_rf
     sharpe = float(excess.mean() / ret.std() * np.sqrt(periods_per_year)) if ret.std() > 0 else 0.0
 
-    downside = ret[ret < daily_rf]
-    down_std = float(downside.std() * np.sqrt(periods_per_year)) if len(downside) > 1 else 1e-8
+    downside_diff = ret - daily_rf
+    downside_diff = downside_diff.clip(upper=0.0)
+    down_std = float(np.sqrt((downside_diff ** 2).mean()) * np.sqrt(periods_per_year)) if len(ret) > 1 else 1e-8
+    down_std = max(down_std, 1e-8)
     sortino = float((ret.mean() - daily_rf) * np.sqrt(periods_per_year) / down_std)
 
     # ----- drawdown -----

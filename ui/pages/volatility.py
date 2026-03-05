@@ -22,7 +22,7 @@ def render(p: SidebarParams) -> None:
 
     provider = get_default_provider()
     try:
-        prices, _ = provider.fetch_history(p.ticker, period=p.history_period)
+        prices, _ = provider.get_stock_data(p.ticker, period=p.history_period)
     except Exception as e:
         st.error(f"Failed to fetch data: {e}")
         return
@@ -31,18 +31,22 @@ def render(p: SidebarParams) -> None:
         st.warning("No price data available.")
         return
 
+    import numpy as np
+    log_returns = np.log(prices["Close"] / prices["Close"].shift(1)).dropna()
+
     # Realised vol
-    hv_series = historical_volatility(prices["Close"], window=20)
-    latest_hv = hv_series.iloc[-1] if len(hv_series) > 0 else 0.0
+    hv_series = historical_volatility(log_returns, window=20)
+    latest_hv = hv_series.dropna().iloc[-1] if len(hv_series.dropna()) > 0 else 0.0
 
     # EWMA
-    ewma = ewma_volatility(prices["Close"])
+    ewma = ewma_volatility(log_returns)
 
     # GARCH
-    garch = garch_volatility(prices["Close"])
+    garch = garch_volatility(log_returns)
 
     # Regime
-    regime = detect_vol_regime(prices["Close"])
+    hv_full = hv_series.dropna()
+    regime = detect_vol_regime(latest_hv, hv_full)
 
     st.subheader("Current Volatility Estimates")
     metric_row(4,
@@ -53,7 +57,7 @@ def render(p: SidebarParams) -> None:
     # Vol cone
     st.subheader("Volatility Cone")
     try:
-        cone = realised_vol_cone(prices["Close"])
+        cone = realised_vol_cone(log_returns)
         fig_cone = plot_volatility_cone(cone)
         st.plotly_chart(fig_cone, use_container_width=True)
     except Exception as e:
@@ -68,10 +72,12 @@ def render(p: SidebarParams) -> None:
     st.subheader("IV Surface (Simulated)")
     st.caption("⚠️ This surface is generated from a parametric model, not live market data.")
     surface = simulated_iv_surface(p.spot, p.volatility)
-    import numpy as np
-    fig_iv = plot_iv_surface_3d(
-        np.array(surface.strikes),
-        np.array(surface.expiries),
-        np.array(surface.iv_matrix),
-    )
-    st.plotly_chart(fig_iv, use_container_width=True)
+    if surface.strike_grid is not None and surface.time_grid is not None and surface.iv_grid is not None:
+        fig_iv = plot_iv_surface_3d(
+            surface.strike_grid,
+            surface.time_grid,
+            surface.iv_grid,
+        )
+        st.plotly_chart(fig_iv, use_container_width=True)
+    else:
+        st.warning("Could not generate IV surface.")
