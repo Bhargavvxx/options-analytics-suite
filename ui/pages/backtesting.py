@@ -1,6 +1,11 @@
 """Backtesting page."""
 from __future__ import annotations
 
+import io
+import json
+from dataclasses import asdict
+from datetime import date, timedelta
+
 import streamlit as st
 import pandas as pd
 
@@ -11,6 +16,33 @@ from backtesting.metrics import compute_metrics
 from backtesting.simulation import run_educational_simulation
 from visualization.backtest_charts import plot_equity_curve, plot_drawdown
 from ui.components import SidebarParams, metric_row
+
+
+def _trades_to_df(trades) -> pd.DataFrame:
+    """Convert list of Trade objects to a detailed DataFrame."""
+    rows = []
+    for t in trades:
+        rows.append({
+            "Entry": t.entry_date,
+            "Exit": t.exit_date,
+            "Direction": t.direction,
+            "Type": t.option_type,
+            "Strike": t.strike,
+            "Entry$": round(t.entry_price, 4),
+            "Exit$": round(t.exit_price, 4),
+            "Qty": t.quantity,
+            "PnL": round(t.pnl, 2),
+            "Cost": round(t.cost, 2),
+            "Entry_IV": round(t.entry_iv, 4),
+            "Exit_IV": round(t.exit_iv, 4),
+            "Entry_T": round(t.entry_T, 4),
+            "Exit_T": round(t.exit_T, 4),
+            "Entry_Spread": round(t.entry_spread, 4),
+            "Exit_Spread": round(t.exit_spread, 4),
+            "Entry_Exec": t.entry_exec_mode,
+            "Exit_Exec": t.exit_exec_mode,
+        })
+    return pd.DataFrame(rows)
 
 
 def render(p: SidebarParams) -> None:
@@ -29,6 +61,14 @@ def render(p: SidebarParams) -> None:
         entry_thresh = col1.number_input("Entry IV/HV threshold", value=1.10, step=0.05)
         exit_thresh = col2.number_input("Exit IV/HV threshold", value=1.00, step=0.05)
         capital = col3.number_input("Initial capital ($)", value=100_000, step=10_000)
+
+        col4, col5 = st.columns(2)
+        use_expiry = col4.checkbox("Use decaying time-to-expiry", value=True)
+        expiry_date = col5.date_input(
+            "Option expiry date",
+            value=date.today() + timedelta(days=30),
+            disabled=not use_expiry,
+        )
 
         if st.button("Run Backtest"):
             provider = get_default_provider()
@@ -66,6 +106,7 @@ def render(p: SidebarParams) -> None:
                 entry_threshold=entry_thresh,
                 exit_threshold=exit_thresh,
                 option_type=p.option_type,
+                expiry_date=expiry_date if use_expiry else None,
             )
             metrics = compute_metrics(result)
 
@@ -95,19 +136,52 @@ def render(p: SidebarParams) -> None:
             fig_dd = plot_drawdown(result)
             st.plotly_chart(fig_dd, use_container_width=True)
 
-            with st.expander("Trade Log"):
-                trades_data = [{
-                    "Entry": t.entry_date, "Exit": t.exit_date,
-                    "Dir": t.direction, "Type": t.option_type,
-                    "K": t.strike, "Entry$": f"{t.entry_price:.4f}",
-                    "Exit$": f"{t.exit_price:.4f}", "PnL": f"{t.pnl:+.2f}",
-                } for t in result.trades]
-                st.dataframe(pd.DataFrame(trades_data), use_container_width=True)
+            # ---- Trade Blotter ----
+            with st.expander("Trade Blotter", expanded=False):
+                blotter_df = _trades_to_df(result.trades)
+                st.dataframe(blotter_df, use_container_width=True)
+
+                dl_col1, dl_col2 = st.columns(2)
+                csv_buf = blotter_df.to_csv(index=False)
+                dl_col1.download_button(
+                    "Download CSV",
+                    data=csv_buf,
+                    file_name="blotter.csv",
+                    mime="text/csv",
+                )
+
+                report_dict = {
+                    "config": asdict(result.config) if result.config else {},
+                    "summary": {
+                        "total_return_pct": metrics.total_return_pct,
+                        "sharpe_ratio": metrics.sharpe_ratio,
+                        "sortino_ratio": metrics.sortino_ratio,
+                        "max_drawdown_pct": metrics.max_drawdown_pct,
+                        "win_rate": metrics.win_rate,
+                        "num_trades": metrics.num_trades,
+                        "total_pnl": result.total_pnl,
+                        "total_costs": result.total_costs,
+                    },
+                    "trades": [asdict(t) for t in result.trades],
+                }
+                # Convert date objects for JSON serialisation
+                json_buf = json.dumps(report_dict, indent=2, default=str)
+                dl_col2.download_button(
+                    "Download Report JSON",
+                    data=json_buf,
+                    file_name="backtest_report.json",
+                    mime="application/json",
+                )
+
+            # ---- Backtest Config ----
+            if result.config:
+                with st.expander("Backtest Configuration (reproducible)"):
+                    st.json(asdict(result.config))
 
     # ---- Monte-Carlo simulation ----
     with tab_sim:
         st.markdown(
-            "⚠️ **Educational only** — simulates GBM paths, not real market dynamics."
+            "**Educational only** — simulates GBM paths, not real market dynamics."
         )
         n_paths = st.slider("Number of paths", 1000, 50_000, 10_000, step=1000)
         if st.button("Run Simulation"):

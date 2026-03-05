@@ -14,6 +14,7 @@ from analytics.volatility import (
     detect_vol_regime,
 )
 from analytics.day_count import year_fraction, DayCountConvention
+from analytics.iv_surface import SurfaceQC
 
 __all__ = [
     "black_scholes_price",
@@ -33,4 +34,5 @@ __all__ = [
     "detect_vol_regime",
     "year_fraction",
     "DayCountConvention",
+    "SurfaceQC",
 ]

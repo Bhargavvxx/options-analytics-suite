@@ -70,7 +70,7 @@ def render(p: SidebarParams) -> None:
 
     # IV Surface (simulated for demonstration)
     st.subheader("IV Surface (Simulated)")
-    st.caption("⚠️ This surface is generated from a parametric model, not live market data.")
+    st.caption("This surface is generated from a parametric model, not live market data.")
     surface = simulated_iv_surface(p.spot, p.volatility)
     if surface.strike_grid is not None and surface.time_grid is not None and surface.iv_grid is not None:
         fig_iv = plot_iv_surface_3d(
@@ -81,3 +81,18 @@ def render(p: SidebarParams) -> None:
         st.plotly_chart(fig_iv, use_container_width=True)
     else:
         st.warning("Could not generate IV surface.")
+
+    # QC diagnostics panel
+    if surface.qc is not None:
+        with st.expander("Surface QC Diagnostics"):
+            qc = surface.qc
+            qc_col1, qc_col2, qc_col3, qc_col4 = st.columns(4)
+            qc_col1.metric("Total Points", qc.total_points)
+            qc_col2.metric("Converged", qc.converged_points)
+            qc_col3.metric("% Missing", f"{qc.pct_missing:.1f}%")
+            qc_col4.metric("Expiries", qc.expiries_count)
+            qc_col5, qc_col6, qc_col7, qc_col8 = st.columns(4)
+            qc_col5.metric("Market IV Used", qc.used_market_iv)
+            qc_col6.metric("Solver Used", qc.used_solver)
+            qc_col7.metric("Solver Failures", qc.solver_failures)
+            qc_col8.metric("IV Range", f"{qc.min_iv:.1%} – {qc.max_iv:.1%}")

@@ -38,7 +38,14 @@ A professional-grade options analytics platform built with Python and Streamlit.
 - Builder from real option-chain data with market-IV or re-solving
 - SciPy `griddata` interpolation
 - Diagnostics: skew slope, smile curvature
+- **SurfaceQC** report: total/converged/failed points, % missing, solver stats, IV range
 - Simulated surface (clearly marked educational) when no market data
+
+### SVI Smile Fit (`analytics/smile.py`)
+- Raw SVI parameterisation (Gatheral 2004): calibrates `a, b, rho, m, sigma` per expiry slice
+- Bounded `least_squares` optimisation with RMSE reporting
+- `calibrate_surface_svi()` for full surface — one fit per tenor
+- Smooth IV curves that can replace scattered market quotes
 
 ### Strategies (`strategies/`)
 - Declarative `StrategyLeg` + `StrategyDefinition` dataclasses
@@ -48,7 +55,12 @@ A professional-grade options analytics platform built with Python and Streamlit.
 
 ### Backtesting (`backtesting/`)
 - Event-driven `BacktestEngine` with trade lifecycle (entry → hold → exit)
-- Explicit transaction costs and bid-ask slippage
+- **Decaying T**: `expiry_date` parameter gives per-bar time-to-expiry via day-count conventions
+- **Bid/ask execution model**: fills at bid/ask when quote columns exist, slippage fallback otherwise
+- **Trade blotter** with enriched fields: bid, ask, spread, execution mode, entry/exit T
+- **BacktestConfig** snapshot for full reproducibility (serialisable to JSON)
+- CSV + JSON export buttons in the Streamlit UI
+- Explicit transaction costs and slippage
 - `PerformanceMetrics`: Sharpe, Sortino, Calmar, max drawdown, profit factor, win rate
 - Monte-Carlo simulation (GBM + antithetic variates) clearly labelled educational
 
@@ -80,24 +92,26 @@ A professional-grade options analytics platform built with Python and Streamlit.
 ├── run.py                          # Streamlit entry point (thin dispatcher)
 ├── config/
 │   ├── settings.py                 # Centralised frozen Settings dataclass (~50 fields)
+│   ├── errors.py                   # Custom exception hierarchy (OASError base)
 │   └── logging_config.py           # Structured logging (replaces all print())
 ├── analytics/
 │   ├── pricing.py                  # BS pricing (price only, vectorised)
 │   ├── greeks.py                   # Analytical + finite-difference Greeks
 │   ├── implied_vol.py              # IV solvers (Newton/Bisection/Brent)
 │   ├── volatility.py               # HV, EWMA, GARCH, regime, vol cone
-│   ├── iv_surface.py               # IV surface builder + diagnostics
+│   ├── iv_surface.py               # IV surface builder + QC diagnostics
+│   ├── smile.py                    # SVI smile calibration (Gatheral 2004)
 │   └── day_count.py                # Year-fraction with day-count conventions
 ├── data/
 │   ├── market_data.py              # Abstract MarketDataProvider + YFinance impl
 │   ├── cache.py                    # Thread-safe TTL cache
-│   └── normalization.py            # OHLCV validation, chain normalization
+│   ├── normalization.py            # OHLCV validation, chain normalization, bid/ask QC
 ├── strategies/
 │   ├── definitions.py              # Composable leg definitions + catalog
 │   ├── pricing.py                  # Strategy pricing & expiry payoff
 │   └── signals.py                  # IV/HV trading signal generation
 ├── backtesting/
-│   ├── engine.py                   # Event-driven backtest with costs/slippage
+│   ├── engine.py                   # Event-driven backtest with decaying T + bid/ask fills
 │   ├── metrics.py                  # Sharpe, Sortino, drawdown, profit factor
 │   └── simulation.py               # Educational Monte-Carlo (GBM paths)
 ├── ml/
@@ -132,7 +146,10 @@ A professional-grade options analytics platform built with Python and Streamlit.
 │   ├── test_volatility.py          # Vol models + regime
 │   ├── test_strategies.py          # Strategy pricing + payoffs + signals
 │   ├── test_backtesting.py         # MC convergence + metrics
-│   └── test_data.py                # Cache + normalization
+│   ├── test_data.py                # Cache + normalization
+│   └── test_new_features.py        # Decaying T, bid/ask, SVI, QC, exceptions
+├── .github/workflows/ci.yml        # GitHub Actions: lint (ruff) + test
+├── ruff.toml                        # Ruff linter/formatter config
 ├── requirements.txt
 ├── .gitignore
 └── README.md
@@ -209,7 +226,7 @@ Test coverage includes pricing benchmarks (Hull 10th ed.), put-call parity, Gree
 
 - **European options only** — Black-Scholes does not price early exercise (American options)
 - **No live streaming data** — yfinance provides delayed snapshots, not tick-level feeds
-- **Backtesting uses static T** — time-to-expiry is not decremented bar-by-bar (simplification)
+- **Backtesting uses decaying T by default** — set an expiry date or use the legacy fixed-T mode
 - **ML predicts volatility, not price direction** — features are price-derived only; no fundamental/macro data
 - **Sentiment is headline-level** — TextBlob/VADER are general-purpose, not finance-tuned
 - **Monte-Carlo is educational** — uses GBM (constant vol), not stochastic vol

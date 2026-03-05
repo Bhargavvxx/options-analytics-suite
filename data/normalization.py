@@ -38,7 +38,7 @@ def validate_ohlcv(df: pd.DataFrame, label: str = "OHLCV") -> pd.DataFrame:
     if not isinstance(df.index, pd.DatetimeIndex):
         try:
             df.index = pd.to_datetime(df.index)
-        except Exception:
+        except (ValueError, TypeError):
             logger.warning("%s: could not convert index to DatetimeIndex", label)
 
     # Drop bad Close values
@@ -115,3 +115,53 @@ def safe_mid_price(
         return None
     except (IndexError, KeyError):
         return None
+
+
+# ---------------------------------------------------------------------------
+# Bid / ask quality gate
+# ---------------------------------------------------------------------------
+
+def validate_bid_ask(
+    df: pd.DataFrame,
+    max_spread_pct: float = 0.20,
+    label: str = "chain",
+) -> pd.DataFrame:
+    """Flag or filter rows with poor bid/ask quality.
+
+    Adds boolean columns:
+    * ``crossed``  — True when bid > ask (data error).
+    * ``wide``     — True when (ask-bid)/mid > *max_spread_pct*.
+
+    Drops crossed rows. Does **not** drop wide rows (caller decides).
+
+    Returns a copy.
+    """
+    if df.empty or "bid" not in df.columns or "ask" not in df.columns:
+        return df
+
+    df = df.copy()
+
+    has_quote = df["bid"].notna() & df["ask"].notna()
+    crossed = has_quote & (df["bid"] > df["ask"])
+    n_crossed = int(crossed.sum())
+
+    if n_crossed > 0:
+        logger.warning("%s: dropping %d crossed-market rows (bid > ask)", label, n_crossed)
+        df = df[~crossed].copy()
+
+    # Recompute has_quote after dropping
+    has_quote = df["bid"].notna() & df["ask"].notna()
+    mid = (df["bid"] + df["ask"]) / 2.0
+    spread_pct = np.where(
+        has_quote & (mid > 0),
+        (df["ask"] - df["bid"]) / mid,
+        0.0,
+    )
+    df["spread_pct"] = spread_pct
+    df["wide"] = spread_pct > max_spread_pct
+
+    n_wide = int(df["wide"].sum())
+    if n_wide > 0:
+        logger.info("%s: %d rows exceed %.0f%% spread threshold", label, n_wide, max_spread_pct * 100)
+
+    return df

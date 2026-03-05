@@ -3,7 +3,7 @@ Implied-volatility surface construction and diagnostics.
 
 Builds a structured IV surface from option-chain data, with
 interpolation for sparse chains and diagnostic metrics for
-smile/skew analysis.
+smile/skew analysis.  Includes a QC report for production use.
 """
 from __future__ import annotations
 
@@ -36,6 +36,24 @@ class IVSurfacePoint:
 
 
 @dataclass
+class SurfaceQC:
+    """Quality-control diagnostics for an IV surface build."""
+    total_points: int = 0
+    converged_points: int = 0
+    failed_points: int = 0
+    pct_missing: float = 0.0
+    used_market_iv: int = 0       # how many used pre-supplied IV
+    used_solver: int = 0          # how many needed IV solving
+    solver_failures: int = 0
+    crossed_markets: int = 0      # bid > ask rows dropped
+    wide_spreads: int = 0         # spread > threshold
+    expiries_count: int = 0
+    min_iv: float = 0.0
+    max_iv: float = 0.0
+    mean_iv: float = 0.0
+
+
+@dataclass
 class IVSurface:
     """Structured IV surface with metadata."""
     spot: float
@@ -45,6 +63,7 @@ class IVSurface:
     iv_grid: Optional[np.ndarray] = None
     is_market_data: bool = False
     diagnostics: Dict[str, float] = field(default_factory=dict)
+    qc: Optional[SurfaceQC] = None
 
 
 # ---------------------------------------------------------------------------
@@ -91,6 +110,8 @@ def build_iv_surface(
     expiry_list = sorted(option_chains.keys())
     now = datetime.now()
 
+    qc = SurfaceQC(expiries_count=len(expiry_list))
+
     for expiry_str in expiry_list:
         calls, puts = option_chains[expiry_str]
         chain = calls if option_type is OptionType.CALL else puts
@@ -110,6 +131,8 @@ def build_iv_surface(
             if not (moneyness_range[0] <= moneyness <= moneyness_range[1]):
                 continue
 
+            qc.total_points += 1
+
             # Try market-supplied IV first
             iv_val: Optional[float] = None
             converged = False
@@ -119,6 +142,7 @@ def build_iv_surface(
                 if pd.notna(mkt_iv) and mkt_iv > 0:
                     iv_val = float(mkt_iv)
                     converged = True
+                    qc.used_market_iv += 1
 
             # Fall back to solving if needed
             if iv_val is None:
@@ -130,13 +154,30 @@ def build_iv_surface(
                     if result.converged and result.iv is not None:
                         iv_val = result.iv
                         converged = True
+                        qc.used_solver += 1
+                    else:
+                        qc.solver_failures += 1
+
+            if iv_val is None:
+                qc.failed_points += 1
+            else:
+                qc.converged_points += 1
 
             points.append(IVSurfacePoint(
                 strike=K, expiry=expiry_str, T=T,
                 iv=iv_val, converged=converged, moneyness=moneyness,
             ))
 
-    surface = IVSurface(spot=S, points=points, is_market_data=True)
+    # Finalise QC stats
+    if qc.total_points > 0:
+        qc.pct_missing = qc.failed_points / qc.total_points * 100.0
+    valid_ivs = [p.iv for p in points if p.iv is not None]
+    if valid_ivs:
+        qc.min_iv = float(np.min(valid_ivs))
+        qc.max_iv = float(np.max(valid_ivs))
+        qc.mean_iv = float(np.mean(valid_ivs))
+
+    surface = IVSurface(spot=S, points=points, is_market_data=True, qc=qc)
 
     # Build interpolated grid if we have enough data
     valid = [p for p in points if p.iv is not None]
@@ -144,6 +185,11 @@ def build_iv_surface(
         surface = _interpolate_surface(surface, valid)
         surface.diagnostics = _compute_diagnostics(surface, S)
 
+    logger.info(
+        "IV surface built: %d/%d converged (%.1f%% missing), %d market-IV, %d solved, %d failed",
+        qc.converged_points, qc.total_points, qc.pct_missing,
+        qc.used_market_iv, qc.used_solver, qc.solver_failures,
+    )
     return surface
 
 

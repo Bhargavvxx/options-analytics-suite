@@ -17,6 +17,7 @@ import pandas as pd
 
 from config.logging_config import get_logger
 from config.settings import Settings
+from config.errors import DataFetchError
 
 logger = get_logger(__name__)
 _CFG = Settings()
@@ -91,7 +92,7 @@ class YFinanceProvider(MarketDataProvider):
                 )
                 if attempt < self._max_retries:
                     time.sleep(self._retry_delay * attempt)
-        raise RuntimeError(
+        raise DataFetchError(
             f"All {self._max_retries} retries exhausted"
         ) from last_exc
 
