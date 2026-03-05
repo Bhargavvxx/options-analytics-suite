@@ -1,190 +1,217 @@
 # Option Analytics Suite
 
-A Streamlit-based web application for options pricing, analysis, and backtesting. The app uses the Black-Scholes model to price European-style options, calculates Greeks, estimates volatility through multiple methods, runs ML-based stock price predictions, and provides sentiment analysis from news headlines.
+A professional-grade options analytics platform built with Python and Streamlit. The codebase implements Black-Scholes European pricing, analytical & finite-difference Greeks, production-quality IV solvers (Newton → Bisection → Brent cascade), multiple volatility models (HV / EWMA / GARCH / regime detection), composable multi-leg strategy definitions, event-driven backtesting with transaction costs, ML volatility prediction pipelines, and news sentiment scoring — all behind a layered architecture with typed dataclass outputs, structured logging, and comprehensive tests.
+
+---
 
 ## Features
 
-### Black-Scholes Pricing & Greeks
-- Prices European call and put options using the Black-Scholes formula with continuous dividend yield support
-- Calculates all five Greeks: Delta, Gamma, Theta, Vega, and Rho
-- Computes implied volatility from market prices using Newton-Raphson with a binary search fallback
-- Input validation on all pricing parameters
+### Pricing Engine (`analytics/pricing.py`)
+- Closed-form Black-Scholes European call/put pricing
+- Vectorised (NumPy array) **and** scalar interface
+- Continuous dividend-yield support
+- Put-call parity verification
+- Optional `validate=False` fast-path for inner loops
 
-### Volatility Estimation
-- **Historical Volatility** — rolling standard deviation of log returns, annualized by default (configurable window)
-- **EWMA Volatility** — exponentially weighted moving average with configurable decay factor (default λ = 0.94), annualized
-- **GARCH(1,1)** — fits a GARCH model via the `arch` library and forecasts one-step-ahead variance; falls back to historical volatility if fitting fails
+### Greeks (`analytics/greeks.py`)
+- **Analytical** closed-form Delta, Gamma, Theta, Vega, Rho (dividend-adjusted)
+- **Finite-difference** Greeks via central-differencing for cross-validation
+- All outputs in a frozen `Greeks` dataclass
+- Theta per calendar day (/365), Vega and Rho per 1 percentage point
 
-### Option Strategies
-Calculates entry prices for ten common strategies:
-- Long Call, Long Put
-- Straddle, Strangle
-- Bull Call Spread, Bear Put Spread
-- Butterfly, Iron Condor
-- Protective Put, Covered Call
+### Implied Volatility (`analytics/implied_vol.py`)
+- Cascading solver: Newton-Raphson → Bisection → Brent (scipy)
+- Arbitrage-bounds pre-check before solver entry
+- Near-zero vega guard in Newton iteration
+- Structured `IVResult` output: IV, converged flag, iterations, method used, residual
+- `batch_solve_iv()` for full option chains
 
-Generates trading signals by comparing implied volatility to historical volatility and recommends strategies based on the IV/HV ratio.
+### Volatility Models (`analytics/volatility.py`)
+- Rolling historical volatility (any window)
+- Realised volatility cone (multi-window percentile stats)
+- EWMA volatility (configurable λ)
+- GARCH(1,1) via `arch` with graceful fallback
+- Forward volatility estimation from term-structure
+- Vol-regime detection (LOW / NORMAL / HIGH / EXTREME)
 
-### Machine Learning Price Prediction
-Three models trained on technical features derived from historical close prices:
-- **Linear Regression** (scikit-learn)
-- **XGBoost** (gradient-boosted trees)
-- **LSTM** (Keras/TensorFlow recurrent neural network with 60-step lookback)
+### IV Surface (`analytics/iv_surface.py`)
+- Builder from real option-chain data with market-IV or re-solving
+- SciPy `griddata` interpolation
+- Diagnostics: skew slope, smile curvature
+- Simulated surface (clearly marked educational) when no market data
 
-Each model uses an 80/20 time-series train/test split (no shuffling) and reports MAE and RMSE on the held-out test set. An ensemble prediction is computed as the mean of all individual model outputs.
+### Strategies (`strategies/`)
+- Declarative `StrategyLeg` + `StrategyDefinition` dataclasses
+- Catalog of 10 pre-built strategies (straddle, strangle, spreads, butterfly, iron condor, protective put, covered call, etc.)
+- `price_strategy()` and `strategy_payoff()` for pricing and expiry P&L
+- IV-vs-HV trading-signal generator
 
-### Sentiment Analysis
-- Fetches recent news headlines for the selected ticker from the Yahoo Finance search API
-- Scores each headline using TextBlob polarity, then scales the average to a -10 to +10 range
-- Maps the score to labels (Very Bearish / Bearish / Neutral / Bullish / Very Bullish) and provides a directional trading recommendation
+### Backtesting (`backtesting/`)
+- Event-driven `BacktestEngine` with trade lifecycle (entry → hold → exit)
+- Explicit transaction costs and bid-ask slippage
+- `PerformanceMetrics`: Sharpe, Sortino, Calmar, max drawdown, profit factor, win rate
+- Monte-Carlo simulation (GBM + antithetic variates) clearly labelled educational
 
-### Implied Volatility Surface
-- When live option chain data is available for multiple expiries, builds a 3D IV surface from market-quoted implied volatilities using scipy `griddata` interpolation
-- Falls back to a simulated volatility smile/skew model when market data is unavailable
+### ML Pipeline (`ml/`)
+- Reproducible feature engineering (`features.py`): 13 price-based features, forward-vol target
+- Model registry: Ridge (baseline), XGBoost, LSTM (PyTorch)
+- **Training** separated from **inference** — no re-training on Streamlit reruns
+- Time-series aware chronological split (no future leakage)
+- Model persistence via joblib / torch.save
 
-### Strategy Backtesting
-- **Volatility Strategy** — trades based on IV vs. HV divergence using synthetic IV generated from historical volatility with a fixed random seed for reproducibility
-- **Option Strategy Backtest** — reprices an option strategy (long call, long put, straddle, strangle) at each historical price point and tracks cumulative returns
-- Displays performance metrics: average daily return, daily volatility, Sharpe ratio, and total return
+### Sentiment (`sentiment/`)
+- Google News RSS fetcher (no API key required)
+- TextBlob and VADER scoring (lazy-loaded)
+- Structured `SentimentSummary` with per-article and aggregate scores
 
-### Interactive Visualizations
-All charts are built with Plotly:
-- Option price vs. spot price curve
-- Option price vs. time to expiry (time decay)
-- 3D implied volatility surface
-- Strategy payoff diagrams at expiration
-- Backtesting results with price, volatility, and return subplots
-- ML model prediction comparison bar chart
-- Real-time market price vs. model price overlay
+### Visualization (`visualization/`)
+- All Plotly: price surfaces, Greeks dashboards, vol cones, IV surfaces, payoff diagrams, equity curves, drawdown, ML comparison, feature importance
 
-### Streamlit UI
-- Auto-refreshes every 60 seconds via `streamlit-autorefresh`
-- Sidebar controls: ticker, expiry selection (from live Yahoo Finance expiry dates), strike price (from live option chain), option type, risk-free rate (auto-fetched from Treasury yields or manual), dividend yield, and volatility method
-- Cached data fetching with configurable TTLs (5 min for prices/chains, 10 min for news, 1 hour for rates)
-- Live option chain display showing calls and puts near the money
-- Educational mode with Black-Scholes formula explanation, Greek definitions, and an interactive quiz
+### UI (`ui/`)
+- **Thin** Streamlit orchestrator (`run.py`) — all logic in library packages
+- Shared sidebar component for consistent parameter input
+- 7 pages: Pricing, Volatility, Strategies, Backtesting, ML, Sentiment, Educational
 
-## Project Structure
+---
+
+## Architecture
 
 ```
-├── app.py                    # Streamlit application entry point
-├── requirements.txt          # Python dependencies with version pins
-├── .gitignore                # Git ignore rules
-├── core/
-│   ├── __init__.py           # Package exports
-│   ├── black_scholes.py      # Black-Scholes pricing, Greeks, implied volatility
-│   ├── volatility.py         # Historical, EWMA, and GARCH volatility models
-│   ├── strategies.py         # Option strategy pricing and trading signal generation
-│   ├── backtesting.py        # Volatility and option strategy backtesting
-│   └── ml_models.py          # StockPricePredictor class (LR, XGBoost, LSTM)
-├── utils/
-│   ├── data_loader.py        # Yahoo Finance data fetching (stocks, options, rates)
-│   ├── realtime_data.py      # Real-time option chain and mid-price calculation
-│   ├── sentiment.py          # News headline fetching and TextBlob sentiment scoring
-│   └── visualizations.py     # Plotly chart functions (prices, IV surface, payoffs, backtesting)
-├── models/
-│   └── __init__.py           # Placeholder for saved model artifacts
-└── tests/
-    └── test_core.py          # Unit tests for pricing, Greeks, volatility, strategies, backtesting
+├── run.py                          # Streamlit entry point (thin dispatcher)
+├── config/
+│   ├── settings.py                 # Centralised frozen Settings dataclass (~50 fields)
+│   └── logging_config.py           # Structured logging (replaces all print())
+├── analytics/
+│   ├── pricing.py                  # BS pricing (price only, vectorised)
+│   ├── greeks.py                   # Analytical + finite-difference Greeks
+│   ├── implied_vol.py              # IV solvers (Newton/Bisection/Brent)
+│   ├── volatility.py               # HV, EWMA, GARCH, regime, vol cone
+│   ├── iv_surface.py               # IV surface builder + diagnostics
+│   └── day_count.py                # Year-fraction with day-count conventions
+├── data/
+│   ├── market_data.py              # Abstract MarketDataProvider + YFinance impl
+│   ├── cache.py                    # Thread-safe TTL cache
+│   └── normalization.py            # OHLCV validation, chain normalization
+├── strategies/
+│   ├── definitions.py              # Composable leg definitions + catalog
+│   ├── pricing.py                  # Strategy pricing & expiry payoff
+│   └── signals.py                  # IV/HV trading signal generation
+├── backtesting/
+│   ├── engine.py                   # Event-driven backtest with costs/slippage
+│   ├── metrics.py                  # Sharpe, Sortino, drawdown, profit factor
+│   └── simulation.py               # Educational Monte-Carlo (GBM paths)
+├── ml/
+│   ├── features.py                 # Feature engineering pipeline
+│   ├── models.py                   # Model registry (Ridge, XGB, LSTM)
+│   ├── training.py                 # Train pipeline (chrono split)
+│   ├── inference.py                # Inference pipeline (stateless)
+│   └── artifacts.py                # Model save / load
+├── sentiment/
+│   └── analyzer.py                 # News fetch + TextBlob / VADER scoring
+├── visualization/
+│   ├── pricing_charts.py           # Price surface, Greeks dashboard
+│   ├── vol_charts.py               # Vol cone, term structure, IV surface 3D
+│   ├── strategy_charts.py          # Payoff diagrams, strategy comparison
+│   ├── backtest_charts.py          # Equity curve, drawdown
+│   └── ml_charts.py                # Model comparison, feature importance
+├── ui/
+│   ├── components.py               # Shared sidebar + metric helpers
+│   └── pages/                      # One module per tab
+│       ├── pricing.py
+│       ├── volatility.py
+│       ├── strategies.py
+│       ├── backtesting.py
+│       ├── ml.py
+│       ├── sentiment.py
+│       └── educational.py
+├── tests/
+│   ├── conftest.py                 # Shared fixtures
+│   ├── test_pricing.py             # BS benchmarks + put-call parity
+│   ├── test_greeks.py              # Analytical / FD cross-validation
+│   ├── test_implied_vol.py         # IV round-trip + edge cases
+│   ├── test_volatility.py          # Vol models + regime
+│   ├── test_strategies.py          # Strategy pricing + payoffs + signals
+│   ├── test_backtesting.py         # MC convergence + metrics
+│   └── test_data.py                # Cache + normalization
+├── requirements.txt
+├── .gitignore
+└── README.md
 ```
+
+---
 
 ## Setup
 
 ### Prerequisites
-- Python 3.9 or higher
+- Python 3.10+
 
 ### Installation
 
-1. Clone the repository:
-   ```bash
-   git clone <repository-url>
-   cd option_analytics_final
-   ```
+```bash
+git clone https://github.com/Bhargavvxx/options-analytics-suite.git
+cd options-analytics-suite
 
-2. Create and activate a virtual environment:
-   ```bash
-   python -m venv venv
-   # Windows
-   venv\Scripts\activate
-   # macOS/Linux
-   source venv/bin/activate
-   ```
+python -m venv .venv
+# Windows
+.venv\Scripts\activate
+# macOS / Linux
+source .venv/bin/activate
 
-3. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
+pip install -r requirements.txt
+```
 
-### Dependencies
-| Package | Purpose |
-|---|---|
-| streamlit | Web application framework |
-| streamlit-autorefresh | Auto-refresh timer for live data |
-| yfinance | Stock and option data from Yahoo Finance |
-| numpy | Numerical computations |
-| pandas | Data manipulation |
-| scipy | Statistical functions (normal distribution, Newton-Raphson, grid interpolation) |
-| plotly | Interactive charts |
-| arch | GARCH volatility model fitting |
-| scikit-learn | Linear Regression, preprocessing, metrics |
-| xgboost | Gradient-boosted tree regressor |
-| tensorflow | LSTM neural network (Keras API) |
-| textblob | Sentiment analysis on news headlines |
-| requests | HTTP requests for Yahoo Finance news API |
+### Optional Dependencies
+| Package | Purpose | Fallback |
+|---|---|---|
+| `arch` | GARCH volatility | EWMA used instead |
+| `xgboost` | Gradient-boosted trees | Ridge regression |
+| `torch` | LSTM model | Ridge regression |
+| `feedparser` | News fetching | Empty results |
+| `textblob` | Sentiment scoring | Neutral scores |
+
+---
 
 ## Usage
 
 ### Running the App
 
 ```bash
-streamlit run app.py
+streamlit run run.py
 ```
 
-The app opens in your browser at `http://localhost:8501`.
-
-### Sidebar Controls
-1. **Stock Ticker** — enter any ticker symbol supported by Yahoo Finance (e.g., AAPL, MSFT, TSLA)
-2. **Option Expiration Date** — populated from live Yahoo Finance expiry dates for the selected ticker
-3. **Underlying Price** — auto-filled from the latest intraday price; editable
-4. **Strike Price** — auto-filled from the nearest ATM strike in the live chain; editable within the available strike range
-5. **Option Type** — Call or Put
-6. **Risk-Free Rate** — automatically fetched from 10-Year Treasury (^TNX) or 3-Month T-Bill (^IRX), or enter manually
-7. **Dividend Yield** — enter as a percentage
-8. **Volatility Method** — choose Manual, Historical, EWMA, or GARCH
-
-### App Tabs
-- **Visualizations** — option price curves and the 3D IV surface
-- **Strategy Analysis** — strategy prices, payoff diagrams, and trading signals
-- **Sentiment** — recent headlines, sentiment score, and recommendation
-- **Backtesting** — run and view backtest results with performance metrics
-- **Educational** — Black-Scholes explanation, Greeks definitions, and a quiz (toggle Educational Mode in sidebar)
+Opens at `http://localhost:8501`.  Use the sidebar to set ticker, strike, expiry, volatility, and other parameters.
 
 ### Running Tests
 
 ```bash
-python -m pytest tests/ -v
+python -m pytest tests/ -v --tb=short
 ```
 
-The test suite covers:
-- Black-Scholes call/put pricing and put-call parity
-- Greek calculations (value ranges, signs, symmetries)
-- Implied volatility round-trip accuracy
-- Volatility model outputs (historical, EWMA, GARCH)
-- Strategy pricing consistency (e.g., straddle = call + put)
-- Backtesting result structure and reproducibility
+Test coverage includes pricing benchmarks (Hull 10th ed.), put-call parity, Greeks sign/range/FD-cross-validation, IV round-trip at various moneyness levels, vol model outputs, strategy pricing/payoff, Monte-Carlo convergence, and data-layer caching.
 
-## Data Sources
+---
 
-- **Stock prices and option chains**: Yahoo Finance via the `yfinance` library
-- **Risk-free rates**: Yahoo Finance Treasury yield tickers (^IRX for 3-month, ^FVX for 5-year, ^TNX for 10-year, ^TYX for 30-year)
-- **News headlines**: Yahoo Finance search API (`query1.finance.yahoo.com`)
-- **Sentiment scoring**: TextBlob polarity analysis
+## Design Decisions
+
+| Decision | Rationale |
+|---|---|
+| Frozen dataclasses for outputs | Immutability prevents downstream mutation bugs |
+| Pricing separated from Greeks separated from IV | Each concern testable and replaceable independently |
+| Abstract `MarketDataProvider` ABC | Swap yfinance for Bloomberg/IBKR without touching analytics |
+| Cascading IV solver | Newton is fast; Bisection/Brent guarantee convergence |
+| ML training separated from inference | Avoids re-training on every Streamlit interaction |
+| Structured logging (no `print()`) | Production diagnostics, configurable verbosity |
+| Centralized `Settings` dataclass | All magic numbers in one place, env-var overridable |
+
+---
 
 ## Limitations
 
-- The Black-Scholes model assumes European-style options; most US equity options are American-style, so model prices may differ from market prices
-- ML predictions are based solely on historical price-derived features and do not account for fundamental data, earnings events, or macroeconomic factors
-- Sentiment analysis uses TextBlob, which provides basic polarity scoring and may not capture financial-specific nuances
-- The backtesting volatility strategy uses synthetic IV (historical volatility plus noise) rather than actual historical implied volatility data
-- Real-time data depends on Yahoo Finance availability and rate limits
-- LSTM training can be slow on machines without GPU support
+- **European options only** — Black-Scholes does not price early exercise (American options)
+- **No live streaming data** — yfinance provides delayed snapshots, not tick-level feeds
+- **Backtesting uses static T** — time-to-expiry is not decremented bar-by-bar (simplification)
+- **ML predicts volatility, not price direction** — features are price-derived only; no fundamental/macro data
+- **Sentiment is headline-level** — TextBlob/VADER are general-purpose, not finance-tuned
+- **Monte-Carlo is educational** — uses GBM (constant vol), not stochastic vol
+- **No margin/portfolio-level risk** — single-strategy focus, no cross-position netting
+- **LSTM requires PyTorch** — falls back to Ridge if torch is not installed

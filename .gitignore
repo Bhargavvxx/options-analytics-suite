@@ -43,6 +43,7 @@ saved_model/
 models/*.pkl
 models/*.joblib
 models/*.h5
+ml_artifacts/
 
 # Logs
 *.log
