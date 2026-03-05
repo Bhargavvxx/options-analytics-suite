@@ -77,12 +77,56 @@ A professional-grade options analytics platform built with Python and Streamlit.
 - Structured `SentimentSummary` with per-article and aggregate scores
 
 ### Visualization (`visualization/`)
-- All Plotly: price surfaces, Greeks dashboards, vol cones, IV surfaces, payoff diagrams, equity curves, drawdown, ML comparison, feature importance
+- All Plotly: price surfaces, Greeks dashboards, vol cones, IV surfaces, payoff diagrams, equity curves, drawdown, ML comparison, feature importance, **arbitrage heatmaps**, **rate-curve plots**, **stress P&L heatmaps**
 
 ### UI (`ui/`)
 - **Thin** Streamlit orchestrator (`run.py`) — all logic in library packages
 - Shared sidebar component for consistent parameter input
-- 7 pages: Pricing, Volatility, Strategies, Backtesting, ML, Sentiment, Educational
+- 8 pages: Pricing, Volatility, Strategies, **Portfolio Risk**, Backtesting, ML, Sentiment, Educational
+
+---
+
+## Phase 2 Features (New)
+
+### Surface Arbitrage Diagnostics (`analytics/arbitrage.py`)
+- **Calendar-spread** check: total variance w = σ²·T must be non-decreasing in T per strike
+- **Butterfly** check: BS call prices must be convex in strike (discrete 2nd difference ≥ 0)
+- Structured `SurfaceArbitrageReport` with violation counts, severity, and bool masks
+- Heatmap visualization of violations overlaid on the strike × expiry grid
+- Integrated into the Volatility Analytics page with a dedicated expander
+
+### American Option Pricing (`analytics/american.py`)
+- Cox-Ross-Rubinstein binomial tree — call and put, European and American exercise
+- Continuous dividend yield *and* discrete cash dividends (escrowed PV method)
+- Configurable tree depth (50–500 steps)
+- Early-exercise boundary extraction for analysis
+- Converges to BS for European options (validated in tests)
+- UI: side-by-side comparison of BS, Binomial European, Binomial American, and early-exercise premium
+
+### Interest-Rate Term Structure (`analytics/rates.py`)
+- `RateCurve` class with piecewise-linear interpolation on zero rates
+- Discount factor `df(T)`, forward rate `forward_rate(T1, T2)`, parallel shift `shift(bp)`
+- Flat-curve and custom-pillar factories
+- Vectorised discount factor computation
+- UI: rate curve chart in the Pricing page expander
+
+### Portfolio Risk Aggregation (`risk/portfolio.py`)
+- `Position` dataclass for options and equities
+- `Portfolio` class with mark-to-market valuation and aggregated Greeks (Delta, Gamma, Theta, Vega, Rho)
+- Per-position contribution breakdown table
+- Interactive portfolio builder in the **Portfolio Risk** UI page
+
+### Stress Testing (`risk/stress.py`)
+- Spot × vol shock grid with configurable shock ranges
+- P&L, Delta, Gamma, Vega matrices under each scenario
+- Worst/best P&L summary
+- RdYlGn heatmap visualization
+- Fully integrated into the Portfolio Risk page
+
+### Strategy Policies & Capital Constraints (`strategies/policy.py`)
+- `StrategyPolicy` ABC: `should_enter()`, `should_exit()`, `should_roll()` per bar
+- `IVMeanReversionPolicy`: short vol when IV/HV rich, close when normalised, DTE-based roll
+- `CapitalConstraints` dataclass: max notional, max positions, per-trade budget, drawdown stop
 
 ---
 
@@ -101,7 +145,13 @@ A professional-grade options analytics platform built with Python and Streamlit.
 │   ├── volatility.py               # HV, EWMA, GARCH, regime, vol cone
 │   ├── iv_surface.py               # IV surface builder + QC diagnostics
 │   ├── smile.py                    # SVI smile calibration (Gatheral 2004)
-│   └── day_count.py                # Year-fraction with day-count conventions
+│   ├── day_count.py                # Year-fraction with day-count conventions
+│   ├── arbitrage.py                # Calendar + butterfly arb checks (Phase 2)
+│   ├── american.py                 # CRR binomial tree pricing (Phase 2)
+│   └── rates.py                    # Zero-rate curve + discount factors (Phase 2)
+├── risk/                            # Portfolio risk package (Phase 2)
+│   ├── portfolio.py                # Position, Portfolio, aggregated Greeks
+│   └── stress.py                   # Scenario-grid stress testing
 ├── data/
 │   ├── market_data.py              # Abstract MarketDataProvider + YFinance impl
 │   ├── cache.py                    # Thread-safe TTL cache
@@ -109,7 +159,8 @@ A professional-grade options analytics platform built with Python and Streamlit.
 ├── strategies/
 │   ├── definitions.py              # Composable leg definitions + catalog
 │   ├── pricing.py                  # Strategy pricing & expiry payoff
-│   └── signals.py                  # IV/HV trading signal generation
+│   ├── signals.py                  # IV/HV trading signal generation
+│   └── policy.py                   # Strategy policies + capital constraints (Phase 2)
 ├── backtesting/
 │   ├── engine.py                   # Event-driven backtest with decaying T + bid/ask fills
 │   ├── metrics.py                  # Sharpe, Sortino, drawdown, profit factor
@@ -124,16 +175,17 @@ A professional-grade options analytics platform built with Python and Streamlit.
 │   └── analyzer.py                 # News fetch + TextBlob / VADER scoring
 ├── visualization/
 │   ├── pricing_charts.py           # Price surface, Greeks dashboard
-│   ├── vol_charts.py               # Vol cone, term structure, IV surface 3D
+│   ├── vol_charts.py               # Vol cone, IV 3D, arb heatmap, rate curve, stress map
 │   ├── strategy_charts.py          # Payoff diagrams, strategy comparison
 │   ├── backtest_charts.py          # Equity curve, drawdown
 │   └── ml_charts.py                # Model comparison, feature importance
 ├── ui/
 │   ├── components.py               # Shared sidebar + metric helpers
 │   └── pages/                      # One module per tab
-│       ├── pricing.py
-│       ├── volatility.py
+│       ├── pricing.py              # BS + American + rate curve
+│       ├── volatility.py           # HV/EWMA/GARCH + IV surface + arb diagnostics
 │       ├── strategies.py
+│       ├── risk.py                 # Portfolio builder + stress testing (Phase 2)
 │       ├── backtesting.py
 │       ├── ml.py
 │       ├── sentiment.py
@@ -147,7 +199,8 @@ A professional-grade options analytics platform built with Python and Streamlit.
 │   ├── test_strategies.py          # Strategy pricing + payoffs + signals
 │   ├── test_backtesting.py         # MC convergence + metrics
 │   ├── test_data.py                # Cache + normalization
-│   └── test_new_features.py        # Decaying T, bid/ask, SVI, QC, exceptions
+│   ├── test_new_features.py        # Decaying T, bid/ask, SVI, QC, exceptions
+│   └── test_phase2.py             # Arb checks, binomial, rates, risk, policies
 ├── .github/workflows/ci.yml        # GitHub Actions: lint (ruff) + test
 ├── ruff.toml                        # Ruff linter/formatter config
 ├── requirements.txt
@@ -224,11 +277,37 @@ Test coverage includes pricing benchmarks (Hull 10th ed.), put-call parity, Gree
 
 ## Limitations
 
-- **European options only** — Black-Scholes does not price early exercise (American options)
 - **No live streaming data** — yfinance provides delayed snapshots, not tick-level feeds
 - **Backtesting uses decaying T by default** — set an expiry date or use the legacy fixed-T mode
 - **ML predicts volatility, not price direction** — features are price-derived only; no fundamental/macro data
 - **Sentiment is headline-level** — TextBlob/VADER are general-purpose, not finance-tuned
 - **Monte-Carlo is educational** — uses GBM (constant vol), not stochastic vol
-- **No margin/portfolio-level risk** — single-strategy focus, no cross-position netting
+- **Binomial tree does not support path-dependent options** — European/American vanilla only
+- **Rate curve uses linear interpolation** — no cubic spline or Nelson-Siegel fitting yet
 - **LSTM requires PyTorch** — falls back to Ridge if torch is not installed
+
+---
+
+## License
+
+This project is licensed under the **MIT License**.
+
+```
+MIT License
+
+Copyright (c) 2025 Bhargav
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+```

@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html class="dark" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Greeks Analysis Overview</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet"/>
+<script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        primary: "#0ea5e9", // Sky blue for accents
+                        "background-light": "#f3f4f6",
+                        "background-dark": "#0f172a", // Slate 900
+                        "card-dark": "#1e293b", // Slate 800
+                        "border-dark": "#334155", // Slate 700
+                    },
+                    fontFamily: {
+                        display: ["Inter", "sans-serif"],
+                    },
+                    borderRadius: {
+                        DEFAULT: "0.5rem",
+                    },
+                },
+            },
+        };
+    </script>
+<style>::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0f172a; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #334155; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569; 
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 dark:text-slate-100 font-display min-h-screen pb-20 md:pb-0">
+<header class="md:hidden flex items-center justify-between p-4 bg-white dark:bg-card-dark border-b border-gray-200 dark:border-border-dark sticky top-0 z-50">
+<div class="flex items-center gap-2">
+<span class="material-icons text-primary">analytics</span>
+<h1 class="text-lg font-bold">Options Suite</h1>
+</div>
+<button class="text-slate-500 dark:text-slate-400">
+<span class="material-icons">menu</span>
+</button>
+</header>
+<div class="flex flex-col md:flex-row h-full md:h-screen overflow-hidden">
+<aside class="hidden md:flex flex-col w-64 bg-white dark:bg-card-dark border-r border-gray-200 dark:border-border-dark flex-shrink-0">
+<div class="p-4 border-b border-gray-200 dark:border-border-dark flex items-center gap-2">
+<span class="material-icons text-primary">analytics</span>
+<h1 class="text-xl font-bold">Options Suite</h1>
+</div>
+<nav class="flex-1 overflow-y-auto p-4 space-y-1">
+<a class="flex items-center gap-3 px-3 py-2 rounded-md bg-primary/10 text-primary font-medium" href="#">
+<span class="material-icons text-sm">functions</span>
+                    Pricing &amp; Greeks
+                </a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-md text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" href="#">
+<span class="material-icons text-sm">timeline</span>
+                    Implied Volatility
+                </a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-md text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" href="#">
+<span class="material-icons text-sm">route</span>
+                    Strategies
+                </a>
+<a class="flex items-center gap-3 px-3 py-2 rounded-md text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors" href="#">
+<span class="material-icons text-sm">history</span>
+                    Backtesting
+                </a>
+</nav>
+<div class="p-4 border-t border-gray-200 dark:border-border-dark">
+<h3 class="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">Parameters</h3>
+<div class="space-y-4">
+<div>
+<label class="block text-sm text-slate-600 dark:text-slate-400 mb-1">Ticker</label>
+<input class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-border-dark rounded-md px-3 py-1.5 text-sm text-slate-900 dark:text-white focus:ring-1 focus:ring-primary focus:border-primary" type="text" value="AAPL"/>
+</div>
+<div>
+<label class="block text-sm text-slate-600 dark:text-slate-400 mb-1">Strike ($)</label>
+<input class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-border-dark rounded-md px-3 py-1.5 text-sm text-slate-900 dark:text-white focus:ring-1 focus:ring-primary focus:border-primary" type="number" value="150"/>
+</div>
+</div>
+</div>
+</aside>
+<main class="flex-1 overflow-y-auto p-4 md:p-6 bg-background-light dark:bg-background-dark">
+<div class="max-w-6xl mx-auto space-y-6">
+<header class="flex justify-between items-center mb-6">
+<h2 class="text-2xl font-bold">Pricing &amp; Greeks Analysis</h2>
+<div class="flex gap-2 text-sm">
+<span class="bg-primary/20 text-primary px-2 py-1 rounded">Call</span>
+<span class="bg-slate-200 dark:bg-slate-700 px-2 py-1 rounded text-slate-700 dark:text-slate-300">European</span>
+</div>
+</header>
+<div class="bg-white dark:bg-card-dark rounded-xl p-6 shadow-sm border border-gray-200 dark:border-border-dark">
+<div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+<div>
+<p class="text-sm text-slate-500 dark:text-slate-400 mb-1">Theoretical Option Price (BSM)</p>
+<h3 class="text-4xl font-bold text-slate-900 dark:text-white">$12.45</h3>
+</div>
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 w-full md:w-auto text-sm">
+<div class="bg-slate-50 dark:bg-slate-900 p-3 rounded-lg border border-slate-100 dark:border-border-dark">
+<span class="block text-slate-500 dark:text-slate-400 mb-1">Spot</span>
+<span class="font-semibold text-slate-800 dark:text-slate-200">$148.50</span>
+</div>
+<div class="bg-slate-50 dark:bg-slate-900 p-3 rounded-lg border border-slate-100 dark:border-border-dark">
+<span class="block text-slate-500 dark:text-slate-400 mb-1">Vol (σ)</span>
+<span class="font-semibold text-slate-800 dark:text-slate-200">24.5%</span>
+</div>
+<div class="bg-slate-50 dark:bg-slate-900 p-3 rounded-lg border border-slate-100 dark:border-border-dark">
+<span class="block text-slate-500 dark:text-slate-400 mb-1">DTE</span>
+<span class="font-semibold text-slate-800 dark:text-slate-200">45</span>
+</div>
+<div class="bg-slate-50 dark:bg-slate-900 p-3 rounded-lg border border-slate-100 dark:border-border-dark">
+<span class="block text-slate-500 dark:text-slate-400 mb-1">Rate (r)</span>
+<span class="font-semibold text-slate-800 dark:text-slate-200">4.2%</span>
+</div>
+</div>
+</div>
+</div>
+<h3 class="text-lg font-semibold mt-8 mb-4 border-b border-gray-200 dark:border-border-dark pb-2">First &amp; Second Order Greeks</h3>
+<div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+<div class="bg-white dark:bg-card-dark rounded-lg p-4 shadow-sm border border-gray-200 dark:border-border-dark">
+<div class="flex justify-between items-start mb-2">
+<h4 class="text-slate-500 dark:text-slate-400 font-medium">Delta (Δ)</h4>
+<span class="material-icons text-primary text-sm">trending_up</span>
+</div>
+<p class="text-2xl font-bold text-slate-800 dark:text-slate-100">0.542</p>
+<p class="text-xs text-slate-400 mt-1 mt-2">Sensitivity to Spot</p>
+</div>
+<div class="bg-white dark:bg-card-dark rounded-lg p-4 shadow-sm border border-gray-200 dark:border-border-dark">
+<div class="flex justify-between items-start mb-2">
+<h4 class="text-slate-500 dark:text-slate-400 font-medium">Gamma (Γ)</h4>
+<span class="material-icons text-primary text-sm">change_history</span>
+</div>
+<p class="text-2xl font-bold text-slate-800 dark:text-slate-100">0.024</p>
+<p class="text-xs text-slate-400 mt-2">Sensitivity to Delta</p>
+</div>
+<div class="bg-white dark:bg-card-dark rounded-lg p-4 shadow-sm border border-gray-200 dark:border-border-dark">
+<div class="flex justify-between items-start mb-2">
+<h4 class="text-slate-500 dark:text-slate-400 font-medium">Theta (Θ)</h4>
+<span class="material-icons text-red-400 text-sm">schedule</span>
+</div>
+<p class="text-2xl font-bold text-slate-800 dark:text-slate-100">-0.056</p>
+<p class="text-xs text-slate-400 mt-2">Daily Time Decay</p>
+</div>
+<div class="bg-white dark:bg-card-dark rounded-lg p-4 shadow-sm border border-gray-200 dark:border-border-dark">
+<div class="flex justify-between items-start mb-2">
+<h4 class="text-slate-500 dark:text-slate-400 font-medium">Vega (ν)</h4>
+<span class="material-icons text-primary text-sm">show_chart</span>
+</div>
+<p class="text-2xl font-bold text-slate-800 dark:text-slate-100">0.215</p>
+<p class="text-xs text-slate-400 mt-2">Sensitivity to Vol (1%)</p>
+</div>
+<div class="bg-white dark:bg-card-dark rounded-lg p-4 shadow-sm border border-gray-200 dark:border-border-dark">
+<div class="flex justify-between items-start mb-2">
+<h4 class="text-slate-500 dark:text-slate-400 font-medium">Rho (ρ)</h4>
+<span class="material-icons text-primary text-sm">account_balance</span>
+</div>
+<p class="text-2xl font-bold text-slate-800 dark:text-slate-100">0.082</p>
+<p class="text-xs text-slate-400 mt-2">Sensitivity to Rates</p>
+</div>
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
+<div class="lg:col-span-2 bg-white dark:bg-card-dark rounded-xl p-4 shadow-sm border border-gray-200 dark:border-border-dark flex flex-col h-96">
+<div class="flex justify-between items-center mb-4">
+<h3 class="font-semibold">Price Surface (Spot vs Vol)</h3>
+<button class="text-slate-400 hover:text-white"><span class="material-icons text-sm">fullscreen</span></button>
+</div>
+<div class="flex-1 bg-slate-50 dark:bg-slate-900 rounded-lg flex items-center justify-center border border-slate-100 dark:border-border-dark relative overflow-hidden">
+<div class="absolute inset-0 opacity-20" style="background: radial-gradient(circle at center, #0ea5e9 0%, transparent 70%);"></div>
+<img alt="3D Surface visualization of option price across spot and volatility" class="w-full h-full object-cover mix-blend-screen" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA00RxFC6YC4TrYktQIzk_mBDBHXk4gWAQi6xi4BifjJdLFm_tuCka7COhsVzJhJIhEp-b_YTnoeYL-yOJhlt9EyvLQA0-DwiOqcj0CKUItg6VmBWP7MEISmAUniTV_QT3CETlABttU6pCfHBmvHQevn0jPPU5TVlt-yZB_OcoxTnQC_sAnW66L4Fjhrhhf4s6jXC40sxUoGS-uv1HIsr4JP1vIxYWeRAAQ8jHx-chE8LI8_QpGqWEVjBnhiTxBIQBWOp6dI55FvV4"/>
+</div>
+</div>
+<div class="flex flex-col gap-4">
+<div class="bg-white dark:bg-card-dark rounded-xl p-4 shadow-sm border border-gray-200 dark:border-border-dark flex-1">
+<h3 class="text-sm font-semibold text-slate-600 dark:text-slate-300 mb-2">Delta vs Spot</h3>
+<div class="h-24 bg-slate-50 dark:bg-slate-900 rounded border border-slate-100 dark:border-border-dark overflow-hidden relative">
+<img alt="Line chart showing Delta versus Spot price" class="w-full h-full object-cover mix-blend-screen" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCUMt6YgGAOvaSzFG-4ieljtrR-ZsqYkmOgvUruVqqBCZlBJnwCC_jkhILdnTbvkSbicItWYiiY7xZhaAKGt5EtQcC7sYFsDbAK3LfDdbLkyJS_8xMIdJbrPnpOYJomjF2H_-QBpCK4bCoITrfKGh2cvOuxGVDxQIjFTCRrgQMnZB6NGVgdEc7WEVjKD2NmmoWo9UN6ZmKs1lpeWB6AzdRWAc_qX1zV4RRI9oK4nRs0E_LIosdpndl58vy1BAc1Q5aAvgMMCzZ1eA8"/>
+</div>
+</div>
+<div class="bg-white dark:bg-card-dark rounded-xl p-4 shadow-sm border border-gray-200 dark:border-border-dark flex-1">
+<h3 class="text-sm font-semibold text-slate-600 dark:text-slate-300 mb-2">Gamma vs Spot</h3>
+<div class="h-24 bg-slate-50 dark:bg-slate-900 rounded border border-slate-100 dark:border-border-dark overflow-hidden relative">
+<img alt="Line chart showing Gamma versus Spot price" class="w-full h-full object-cover mix-blend-screen" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA07kCMj1fhiFgxNoAiT3Gn8f87fLaxTrxja_aDah4DCJGlnONwEjcbcR_K6Noe3yfXaqcYVBfLsZbJzP9UKnWDkM5aM8GFRo-EqywSvoBvAsJliKrX6iiYUV7MF_U0Q3HVzGl73RDL44dn9hsZ9pNugHK9hVGDuVdwJ7Cfmx1SLpCLOhwdDor78ykjbruTWQe8qsID8wqLPP-ZcQH3lMStpR9a8MFMf-E0jP0VI9GAPHSS3ZXJtfESxH9f5N6KXVdvcO_fhPWrY_o"/>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+
+</body></html>

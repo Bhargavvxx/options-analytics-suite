@@ -4,6 +4,9 @@ from visualization.vol_charts import (
     plot_volatility_cone,
     plot_volatility_term_structure,
     plot_iv_surface_3d,
+    plot_arbitrage_heatmap,
+    plot_rate_curve,
+    plot_stress_heatmap,
 )
 from visualization.strategy_charts import plot_strategy_payoff, plot_strategy_comparison
 from visualization.backtest_charts import plot_equity_curve, plot_drawdown
@@ -15,6 +18,9 @@ __all__ = [
     "plot_volatility_cone",
     "plot_volatility_term_structure",
     "plot_iv_surface_3d",
+    "plot_arbitrage_heatmap",
+    "plot_rate_curve",
+    "plot_stress_heatmap",
     "plot_strategy_payoff",
     "plot_strategy_comparison",
     "plot_equity_curve",

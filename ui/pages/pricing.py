@@ -42,3 +42,37 @@ def render(p: SidebarParams) -> None:
     st.subheader("Greeks vs Spot")
     fig_greeks = plot_greeks_dashboard(p.spot, p.strike, p.expiry_years, p.risk_free_rate, p.volatility, p.option_type, p.dividend_yield)
     st.plotly_chart(fig_greeks, use_container_width=True)
+
+    # ---- American pricing (Track 2) ------------------------------------
+    st.subheader("American Option Pricing (Binomial Tree)")
+    from analytics.american import binomial_price, ExerciseStyle
+    import numpy as np
+
+    am_steps = st.slider("Binomial steps", 50, 500, 200, step=50)
+    am_result = binomial_price(
+        p.spot, p.strike, p.expiry_years, p.risk_free_rate, p.volatility,
+        option_type=opt, q=p.dividend_yield,
+        exercise=ExerciseStyle.AMERICAN, steps=am_steps,
+    )
+    eu_result = binomial_price(
+        p.spot, p.strike, p.expiry_years, p.risk_free_rate, p.volatility,
+        option_type=opt, q=p.dividend_yield,
+        exercise=ExerciseStyle.EUROPEAN, steps=am_steps,
+    )
+    early_ex_premium = am_result.price - eu_result.price
+
+    metric_row(4,
+        ["BS (European)", "Binomial (European)", "Binomial (American)", "Early-Exercise Premium"],
+        [f"${price:.4f}", f"${eu_result.price:.4f}", f"${am_result.price:.4f}", f"${early_ex_premium:.4f}"],
+    )
+
+    # ---- Rate curve (Track 3) ------------------------------------------
+    with st.expander("Interest Rate Term Structure"):
+        from analytics.rates import RateCurve, flat_curve
+        from visualization.vol_charts import plot_rate_curve
+
+        st.caption("Flat curve from sidebar risk-free rate; edit pillars for a custom curve.")
+        curve = flat_curve(p.risk_free_rate, label=f"Flat {p.risk_free_rate:.2%}")
+        fig_rc = plot_rate_curve(curve.pillars, curve.rates, label=curve.label)
+        st.plotly_chart(fig_rc, use_container_width=True)
+        st.markdown(f"Discount factor at T={p.expiry_years:.2f}y: **{curve.df(p.expiry_years):.6f}**")

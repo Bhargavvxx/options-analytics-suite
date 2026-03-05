@@ -36,6 +36,7 @@ PAGES = {
     "Pricing & Greeks": "ui.pages.pricing",
     "Volatility Analytics": "ui.pages.volatility",
     "Strategy Analysis": "ui.pages.strategies",
+    "Portfolio Risk": "ui.pages.risk",
     "Backtesting": "ui.pages.backtesting",
     "ML Predictions": "ui.pages.ml",
     "Sentiment": "ui.pages.sentiment",

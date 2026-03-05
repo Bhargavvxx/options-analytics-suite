@@ -96,3 +96,24 @@ def render(p: SidebarParams) -> None:
             qc_col6.metric("Solver Used", qc.used_solver)
             qc_col7.metric("Solver Failures", qc.solver_failures)
             qc_col8.metric("IV Range", f"{qc.min_iv:.1%} – {qc.max_iv:.1%}")
+
+    # Arbitrage diagnostics
+    if (surface.iv_grid is not None
+            and surface.strike_grid is not None
+            and surface.time_grid is not None):
+        with st.expander("Arbitrage Diagnostics"):
+            from analytics.arbitrage import surface_arbitrage_check
+            from visualization.vol_charts import plot_arbitrage_heatmap
+
+            arb = surface_arbitrage_check(
+                surface.iv_grid, surface.strike_grid, surface.time_grid,
+                S=p.spot, r=p.risk_free_rate, q=p.dividend_yield,
+            )
+            ac1, ac2, ac3, ac4 = st.columns(4)
+            ac1.metric("Grid Points", arb.total_grid_points)
+            ac2.metric("Calendar Violations", arb.calendar_violations)
+            ac3.metric("Butterfly Violations", arb.butterfly_violations)
+            ac4.metric("Cal Violation %", f"{arb.calendar_violation_pct:.1f}%")
+
+            fig_arb = plot_arbitrage_heatmap(arb, surface.strike_grid, surface.time_grid)
+            st.plotly_chart(fig_arb, use_container_width=True)
